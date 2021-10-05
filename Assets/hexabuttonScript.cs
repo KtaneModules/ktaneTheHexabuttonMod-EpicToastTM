@@ -21,7 +21,7 @@ public class hexabuttonScript : MonoBehaviour
     private bool solved;
 
     private bool held;
-    private bool released;
+    private bool released = true;
     private readonly string[] labels = { "Jump", "Boom", "Claim", "Button", "Hold", "Blue" };
     private readonly Color32[] actualBtnColors = { new Color32(0, 0, 0, 255), new Color32(69, 125, 195, 255), new Color32(195, 69, 69, 255), new Color32(195, 195, 69, 255), new Color32(45, 150, 45, 255) };
     private int labelNum;
@@ -62,6 +62,8 @@ public class hexabuttonScript : MonoBehaviour
 
         btnSelectable.OnInteractEnded += delegate ()
         {
+            if (released)
+                return;
             StopAllCoroutines();
             released = true;
             Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.BigButtonRelease, Module.transform);
@@ -200,6 +202,54 @@ public class hexabuttonScript : MonoBehaviour
             return;
         }
 
+        answerCorrect = ReleaseCorrect(false);
+
+        if (answerCorrect)
+        {
+            DebugMsg("That was right!");
+            Module.HandlePass();
+            solved = true;
+            StartCoroutine("SolveAnim");
+        }
+
+        else
+        {
+            DebugMsg("But that was wrong.");
+            Module.HandleStrike();
+        }
+    }
+
+    void Tap()
+    {
+        DebugMsg("You tapped at " + Bomb.GetFormattedTime());
+
+        if (!answerIsTap)
+        {
+            Module.HandleStrike();
+            DebugMsg("You were supposed to hold the button. STRIKE!");
+            return;
+        }
+
+        answerCorrect = TapCorrect(false);
+
+        if (answerCorrect)
+        {
+            DebugMsg("That was right!");
+            Module.HandlePass();
+            solved = true;
+            StartCoroutine("SolveAnim");
+        }
+
+        else
+        {
+            DebugMsg("But that was wrong.");
+            Module.HandleStrike();
+        }
+    }
+
+    bool ReleaseCorrect(bool autosolve)
+    {
+        bool answerCorrect = false;
         if (typeOfLight == 0)
         {
             if (lightColor == 5)
@@ -290,44 +340,25 @@ public class hexabuttonScript : MonoBehaviour
                 releaseTime += 1;
 
             releaseTime %= 60;
-            if (releaseTime > 9)
-                DebugMsg("You should release the button when the last two seconds digits on the timer are " + releaseTime + ".");
-            else
-                DebugMsg("You should release the button when the last two seconds digits on the timer are 0" + releaseTime + ".");
+            if (!autosolve)
+            {
+                if (releaseTime > 9)
+                    DebugMsg("You should release the button when the last two seconds digits on the timer are " + releaseTime + ".");
+                else
+                    DebugMsg("You should release the button when the last two seconds digits on the timer are 0" + releaseTime + ".");
+            }
 
             if ((int)Bomb.GetTime() % 60 == releaseTime)
             {
                 answerCorrect = true;
             }
         }
-
-        if (answerCorrect)
-        {
-            DebugMsg("That was right!");
-            Module.HandlePass();
-            solved = true;
-            StartCoroutine("SolveAnim");
-        }
-
-        else
-        {
-            DebugMsg("But that was wrong.");
-            Module.HandleStrike();
-        }
+        return answerCorrect;
     }
 
-    void Tap()
+    bool TapCorrect(bool autosolve)
     {
-        answerCorrect = false;
-        DebugMsg("You tapped at " + Bomb.GetFormattedTime());
-
-        if (!answerIsTap)
-        {
-            Module.HandleStrike();
-            DebugMsg("You were supposed to hold the button. STRIKE!");
-            return;
-        }
-
+        bool answerCorrect = false;
         if (ruleApplied == 2)
         {
             if ((int)Bomb.GetTime() % 34 == 0)
@@ -401,7 +432,8 @@ public class hexabuttonScript : MonoBehaviour
                 answerCorrect = true;
             }
 
-            DebugMsg("The sum of the serial number numbers is " + sum + ".");
+            if (!autosolve)
+                DebugMsg("The sum of the serial number numbers is " + sum + ".");
         }
 
         else
@@ -411,20 +443,7 @@ public class hexabuttonScript : MonoBehaviour
                 answerCorrect = true;
             }
         }
-
-        if (answerCorrect)
-        {
-            DebugMsg("That was right!");
-            Module.HandlePass();
-            solved = true;
-            StartCoroutine("SolveAnim");
-        }
-
-        else
-        {
-            DebugMsg("But that was wrong.");
-            Module.HandleStrike();
-        }
+        return answerCorrect;
     }
 
     void DebugMsg(string msg)
@@ -525,11 +544,11 @@ public class hexabuttonScript : MonoBehaviour
             yield return new WaitForSeconds(.075f);
         }
 
+        btnRenderer.material = normalMat;
         btnRenderer.material.color = actualBtnColors[0];
         btnText.text = ":)";
     }
 
-    bool TwitchShouldCancelCommand;
     public string TwitchHelpMessage = "Use !{0} tap X:XX / !{0} slap X:XX where X:XX is the last three digits of the time you want to tap the button on. Use !{0} hold to hold the button. Use !{0} release X:XX where X:XX is the last three digits of the time you want to release the button on.";
 
     IEnumerator ProcessTwitchCommand(string command)
@@ -583,7 +602,7 @@ public class hexabuttonScript : MonoBehaviour
         {
             yield return null;
 
-            if (held)
+            if (held && !released)
             {
                 yield return "sendtochaterror Uh... it's already held.";
                 yield break;
@@ -591,6 +610,41 @@ public class hexabuttonScript : MonoBehaviour
 
             btnSelectable.OnInteract();
             yield return new WaitForSeconds(1.5f);
+        }
+    }
+
+    IEnumerator TwitchHandleForcedSolve()
+    {
+        if ((answerIsTap && held && !released) || (answerIsTap && !held && !released && !TapCorrect(true)))
+        {
+            StopAllCoroutines();
+            released = true;
+            Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.BigButtonRelease, Module.transform);
+
+            Module.HandlePass();
+            solved = true;
+            StartCoroutine("SolveAnim");
+            yield break;
+        }
+
+        if (answerIsTap)
+        {
+            if (!held && !released)
+                btnSelectable.OnInteractEnded();
+            else
+            {
+                while (!TapCorrect(true)) yield return true;
+                btnSelectable.OnInteract();
+                yield return new WaitForSeconds(0.1f);
+                btnSelectable.OnInteractEnded();
+            }
+        }
+        else
+        {
+            if (released)
+                btnSelectable.OnInteract();
+            while (!held || !ReleaseCorrect(true)) yield return true;
+            btnSelectable.OnInteractEnded();
         }
     }
 }
