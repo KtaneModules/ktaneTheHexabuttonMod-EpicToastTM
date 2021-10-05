@@ -1364,6 +1364,10 @@ MonoBehaviour:
   - {fileID: 2800000, guid: 68d8d42bab535b146aa38272b8bab328, type: 3}
   - {fileID: 2800000, guid: 017be2dc7af6eb64e9805c01837074c8, type: 3}
   normalMat: {fileID: 2100000, guid: cf2cef1305c5ad245a8fdadf459ddb09, type: 2}
+  TwitchHelpMessage: Use !{0} tap X:XX / !{0} slap X:XX where X:XX is the last three
+    digits of the time you want to tap the button on. Use !{0} hold to hold the button.
+    Use !{0} release X:XX where X:XX is the last three digits of the time you want
+    to release the button on.
 --- !u!114 &114333725187465880
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -1403,7 +1407,7 @@ MonoBehaviour:
   Children:
   - {fileID: 114855340616096032}
   IsPassThrough: 0
-  ChildRowLength: 0
+  ChildRowLength: 1
   Highlight: {fileID: 114887644989786768}
   SelectableColliders: []
   DefaultSelectableIndex: 0
